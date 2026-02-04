@@ -34,7 +34,7 @@ def parse_can_frame(frame):
         service_not_message = bool((can_id >> 7) & 1)
         if service_not_message:
             destination_node_id = (can_id >> 8) & 0x7F
-            request_not_response = bool((can_id >> 15) & 1)
+            # request_not_response = bool((can_id >> 15) & 1)
             service_type_id = (can_id >> 16) & 0xFF
             try:
                 data_type_name = dronecan.DATATYPES[(service_type_id, dronecan.dsdl.CompoundType.KIND_SERVICE)].full_name
@@ -157,15 +157,31 @@ class TrafficStatCounter:
         self._rx = 0
         self._tx = 0
         self._fps = 0
+        self._bits_since_last_checkpoint = 0
+        self._prev_load_rate_checkpoint_mono = 0
+        self._last_load_rate_estimates = [0] * self.MOVING_AVERAGE_LENGTH
         self._prev_fps_checkpoint_mono = 0
         self._frames_since_fps_checkpoint = 0
         self._last_fps_estimates = [0] * self.MOVING_AVERAGE_LENGTH
+
+    def get_ext_frame_bits(self, frame):
+        return 66 + 8 * len(frame.data)
 
     def add_frame(self, direction, frame):
         if direction == 'tx':
             self._tx += 1
         else:
             self._rx += 1
+
+        # Updating load rate estimate.
+        self._bits_since_last_checkpoint += self.get_ext_frame_bits(frame)
+        dt = frame.ts_monotonic - self._prev_load_rate_checkpoint_mono
+        if dt >= self.FPS_ESTIMATION_WINDOW:
+            self._last_load_rate_estimates.pop()
+            self._last_load_rate_estimates.insert(0, (self._bits_since_last_checkpoint / dt) / 1000000)
+            self._prev_load_rate_checkpoint_mono = frame.ts_monotonic
+            self._bits_since_last_checkpoint = 0
+
 
         # Updating FPS estimate.
         # It is extremely important that the algorithm relies only on the timestamps provided by the driver!
@@ -190,6 +206,9 @@ class TrafficStatCounter:
     @property
     def total(self):
         return self._rx + self._tx
+
+    def get_load_rate(self):
+        return (sum(self._last_load_rate_estimates) / len(self._last_load_rate_estimates)), self._prev_load_rate_checkpoint_mono
 
     def get_frames_per_second(self):
         return (sum(self._last_fps_estimates) / len(self._last_fps_estimates)), self._prev_fps_checkpoint_mono
@@ -250,7 +269,7 @@ class BusMonitorWindow(QMainWindow):
 
     def __init__(self, get_frame, iface_name):
         super(BusMonitorWindow, self).__init__()
-        self.setWindowTitle('CAN bus monitor (%s)' % iface_name.split(os.path.sep)[-1])
+        self.setWindowTitle('CAN Bus Monitor (%s)' % iface_name.split(os.path.sep)[-1])
         self.setWindowIcon(get_app_icon())
 
         # get dsdl_directory from parent process, if set
@@ -269,8 +288,8 @@ class BusMonitorWindow(QMainWindow):
         self._log_widget.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self._log_widget.table.customContextMenuRequested.connect(self._context_menu_requested)
 
-        self._stat_display = QLabel('0 / 0 / 0', self)
-        stat_display_label = QLabel('TX / RX / FPS: ', self)
+        self._stat_display = QLabel('0 / 0 / 0 / 0.0%', self)
+        stat_display_label = QLabel('TX / RX / FPS / Load (%): ', self)
         stat_display_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._log_widget.custom_area_layout.addWidget(stat_display_label)
         self._log_widget.custom_area_layout.addWidget(self._stat_display)
@@ -374,14 +393,16 @@ class BusMonitorWindow(QMainWindow):
             self._log_widget.add_item_async((direction, frame))
 
         bus_load, _ = self._traffic_stat.get_frames_per_second()
-        self._stat_display.setText('%d / %d / %d' % (self._traffic_stat.tx, self._traffic_stat.rx, bus_load))
+        load_rate, _ = self._traffic_stat.get_load_rate()
+        self._stat_display.setText('%d / %d / %d / %.1f%%' % (self._traffic_stat.tx, self._traffic_stat.rx, bus_load, load_rate * 100))
 
     def _decode_transfer_at_row(self, row):
         try:
-            rows, text = decode_transfer_from_frame(row, partial(row_to_frame, self._log_widget.table))
+            # rows, text = decode_transfer_from_frame(row, partial(row_to_frame, self._log_widget.table))
+            _, text = decode_transfer_from_frame(row, partial(row_to_frame, self._log_widget.table))
         except Exception as ex:
             text = 'Transfer could not be decoded:\n' + str(ex)
-            rows = [row]
+            # rows = [row]
 
         self._decoded_message_box.setPlainText(text.strip())
 
