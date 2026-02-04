@@ -71,7 +71,7 @@ class InfoBox(QGroupBox):
         self._update_timer = QTimer(self)
         self._update_timer.timeout.connect(self._update)
         self._update_timer.setSingleShot(False)
-        self._update_timer.start(1000)
+        self._update_timer.start(500) # 1000 -> 500ms
 
         layout = QGridLayout(self)
 
@@ -177,21 +177,29 @@ class Controls(QGroupBox):
         self._file_server_widget = file_server_widget
         self._dynamic_node_id_allocator_widget = dynamic_node_id_allocator_widget
 
-        self._restart_button = make_icon_button('fa6s.power-off', 'Restart the node [dronecan.uavcan.protocol.RestartNode]', self,
-                                                text='Restart', on_clicked=self._do_restart)
+        self._restart_button = make_icon_button('fa6s.power-off', 'Restart the node to Application [dronecan.uavcan.protocol.RestartNode]', self,
+                                                text='Reboot to App', on_clicked=self._do_restart)
+        
+        self._restart_bl_button = make_icon_button('fa6s.play', 'Restart the node to Bootloader [dronecan.uavcan.protocol.param.ExecuteOpCode(3)]', self,
+                                                text='Reboot to BL', on_clicked=self._do_restart_to_bl)
 
         self._transport_stats_button = make_icon_button('fa6s.truck',
                                                         'Request transport stats [dronecan.uavcan.protocol.GetTransportStats]',
-                                                        self, text='Get Transport Stats',
+                                                        self, text='Get Stats',
                                                         on_clicked=self._do_get_transport_stats)
+        
+        self._identify_button = make_icon_button('fa6s.bullhorn', 'Identify the node [dronecan.uavcan.protocol.param.ExecuteOpCode(4)]', self,
+                                                text='Identify', on_clicked=self._do_identify)
 
         self._update_button = make_icon_button('fa6s.bug',
                                                'Request firmware update [dronecan.uavcan.protocol.file.BeginFirmwareUpdate]',
-                                               self, text='Update Firmware', on_clicked=self._do_firmware_update)
+                                               self, text='Update FW', on_clicked=self._do_firmware_update)
 
         layout = QHBoxLayout(self)
         layout.addWidget(self._restart_button, 1)
+        layout.addWidget(self._restart_bl_button, 1)
         layout.addWidget(self._transport_stats_button, 1)
+        layout.addWidget(self._identify_button, 1)
         layout.addWidget(self._update_button, 1)
         self.setLayout(layout)
 
@@ -199,6 +207,24 @@ class Controls(QGroupBox):
         request = dronecan.uavcan.protocol.RestartNode.Request(magic_number=dronecan.uavcan.protocol.RestartNode.Request().MAGIC_NUMBER)
         if not request_confirmation('Confirm node restart',
                                     'Do you really want to send request dronecan.uavcan.protocol.RestartNode?', self):
+            return
+
+        def callback(e):
+            if e is None:
+                self.window().show_message('Restart request timed out')
+            else:
+                self.window().show_message('Restart request response: %s', e.response)
+
+        try:
+            self._node.request(request, self._target_node_id, callback, priority=REQUEST_PRIORITY)
+            self.window().show_message('Restart requested')
+        except Exception as ex:
+            show_error('Node error', 'Could not send restart request', ex, self)
+    
+    def _do_restart_to_bl(self):
+        request = dronecan.uavcan.protocol.param.ExecuteOpcode.Request(opcode=3)
+        if not request_confirmation('Confirm node restart',
+                                    'Do you really want to send request dronecan.uavcan.protocol.param.ExecuteOpcode(opcode=3)?', self):
             return
 
         def callback(e):
@@ -238,6 +264,20 @@ class Controls(QGroupBox):
         except Exception as ex:
             show_error('Node error', 'Could not send stats request', ex, self)
 
+    def _do_identify(self):
+        request = dronecan.uavcan.protocol.param.ExecuteOpcode.Request(opcode=4)
+
+        def callback(e):
+            if e is None:
+                self.window().show_message('Identify request timed out')
+            else:
+                self.window().show_message('Identify request response: %s', e.response)
+
+        try:
+            self._node.request(request, self._target_node_id, callback, priority=REQUEST_PRIORITY)
+            self.window().show_message('Identify requested')
+        except Exception as ex:
+            show_error('Node error', 'Could not send identify request', ex, self)
 
     def _do_firmware_update(self):
         # Making sure the node is not anonymous
