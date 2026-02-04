@@ -141,14 +141,16 @@ class InfoBox(QGroupBox):
             self._sw_version_crc[0].set(swver)
 
             if inf.software_version.optional_field_flags & inf.software_version.OPTIONAL_FIELD_FLAG_IMAGE_CRC:
-                self._sw_version_crc[1].set('0x%016x' % inf.software_version.image_crc)
+                self._sw_version_crc[1].set('0x%016X' % inf.software_version.image_crc)
             else:
                 self._sw_version_crc[1].clear()
 
             self._hw_version_uid[0].set('%d.%d' % (inf.hardware_version.major, inf.hardware_version.minor))
 
             if not all([x == 0 for x in inf.hardware_version.unique_id]):
-                self._hw_version_uid[1].set(' '.join(['%02x' % x for x in inf.hardware_version.unique_id]))
+                # self._hw_version_uid[1].set(' '.join(['%02x' % x for x in inf.hardware_version.unique_id]))
+                uid_int = int.from_bytes(inf.hardware_version.unique_id, byteorder='little', signed=False)
+                self._hw_version_uid[1].set(str(uid_int))
             else:
                 self._hw_version_uid[1].clear()
 
@@ -664,7 +666,7 @@ class ConfigParams(QGroupBox):
             if self._retries < 5:
                 self._retries += 1
                 self.window().show_message('Re-requesting index %d', index)
-                self._node.defer(0.1, lambda: self._node.request(dronecan.uavcan.protocol.param.GetSet.Request(index=index),
+                self._node.defer(0.05, lambda: self._node.request(dronecan.uavcan.protocol.param.GetSet.Request(index=index),
                                                                 self._target_node_id,
                                                                 partial(self._on_fetch_response, index),
                                                                 priority=REQUEST_PRIORITY))
@@ -686,7 +688,7 @@ class ConfigParams(QGroupBox):
         try:
             index += 1
             self.window().show_message('Requesting index %d', index)
-            self._node.defer(0.1, lambda: self._node.request(dronecan.uavcan.protocol.param.GetSet.Request(index=index),
+            self._node.defer(0.05, lambda: self._node.request(dronecan.uavcan.protocol.param.GetSet.Request(index=index),
                                                              self._target_node_id,
                                                              partial(self._on_fetch_response, index),
                                                              priority=REQUEST_PRIORITY))
