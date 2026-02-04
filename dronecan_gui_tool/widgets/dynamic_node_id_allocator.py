@@ -65,6 +65,8 @@ class DynamicNodeIDAllocatorWidget(QGroupBox):
         db_file_completer.setModel(QDirModel(db_file_completer))
         self._database_file.setCompleter(db_file_completer)
 
+        self.last_node_id = None
+
         self._sync_gui()
 
         layout = QVBoxLayout(self)
@@ -123,6 +125,12 @@ class DynamicNodeIDAllocatorWidget(QGroupBox):
         self._allocation_table.setUpdatesEnabled(False)
 
         if self._allocator is None:
+
+            if self.last_node_id == None and self._node.node_id:
+                if self._node.node_id <= 127 and self._node.node_id > 0: # enable DNA automatically after local node ID is set
+                    self._on_start_stop_button()
+                    self.last_node_id = self._node.node_id
+
             self._allocation_table.setRowCount(0)
         else:
             known_entries = [] if self._allocator is None else self._allocator.get_allocation_table()
