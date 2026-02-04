@@ -1,0 +1,38 @@
+# This message is designed to provide low-resolution but high-frequency feedback from the ESC using very low bandwidth.
+# Total maximum bits: 56
+
+float32 RPM_AMP_RANGE_RATIO = 2.0
+
+uint32 MIN_BROADCASTING_PERIOD_MS = 1
+uint32 MAX_BROADCASTING_PERIOD_MS = 100
+
+# data[0]
+          uint4  STATE_IDLE                           = 0
+          uint4  STATE_STARTUP_SEQUENCE               = 1
+          uint4  STATE_BASIC_PARAM_CALIBRATION        = 2
+          uint4  STATE_ENCODER_INDEX_SEARCH           = 3
+          uint4  STATE_ENCODER_CALIBRATION            = 4
+          uint4  STATE_EXTENDED_PARAM_CALIBRATION     = 5
+          uint4  STATE_SENSORED_CLOSED_LOOP_CONTROL   = 6
+          uint4  STATE_SENSORLESS_CLOSED_LOOP_CONTROL = 7
+          uint4  STATE_OPEN_LOOP_VELOCITY_CONTROL     = 8
+saturated uint4  state                                # [IDLE, ...] total 8 states
+
+          uint2  CONTROL_MODE_POSITION                = 0
+          uint2  CONTROL_MODE_VELOCITY                = 1
+          uint2  CONTROL_MODE_CURRENT                 = 2
+          uint2  CONTROL_MODE_HYBRID                  = 3
+saturated uint2  control_mode                         # [POSITION, VELOCITY, CURRENT, HYBRID]
+
+saturated  bool  has_error                            # 0: no error, 1: has error (send GetError for further info)
+
+saturated  bool  is_armed                             # 0: disarmed, 1: armed
+
+# data[1,2]
+saturated uint16 output_single_round                  # [     0,+65535] (0.0055°/LSB)
+
+# data[3,4]
+saturated  int16 output_velocity_rpm                  # [-32768,+32767] (((RPM_AMP_RANGE_RATIO) * max_output_speed_rpm * 2 / 65535)RPM/LSB)
+
+# data[5,6]
+saturated  int16 phase_q_current_amp                  # [-32768,+32767] (((RPM_AMP_RANGE_RATIO) * max_current * 2 / 65535)A/LSB)
