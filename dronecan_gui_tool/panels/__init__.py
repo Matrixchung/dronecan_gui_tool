@@ -40,10 +40,10 @@ class PanelDescriptor:
 PANELS = [
     PanelDescriptor(esc_panel),
     PanelDescriptor(actuator_panel),
-    PanelDescriptor(RTK_panel),
+    # PanelDescriptor(RTK_panel),
     PanelDescriptor(serial_panel),
     PanelDescriptor(stats_panel),
-    PanelDescriptor(RemoteID_panel),
+    # PanelDescriptor(RemoteID_panel),
     PanelDescriptor(hobbywing_esc),
-    PanelDescriptor(rc_panel)
+    # PanelDescriptor(rc_panel)
 ]
