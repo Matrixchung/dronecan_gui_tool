@@ -124,7 +124,9 @@ class BasicTable(QTableWidget):
             w.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
             self.setItem(row, col, w)
 
-        self.setRowHidden(row, not self.apply_filter_to_row(row))
+        # self.setRowHidden(row, not self.apply_filter_to_row(row))
+        if not self.apply_filter_to_row(row):
+            self.removeRow(row)
 
     def keyPressEvent(self, qkeyevent):
         if qkeyevent.matches(QKeySequence.Copy):
